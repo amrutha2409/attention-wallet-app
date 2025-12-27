@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Attention Wallet</title>
+
+<style>
+*{font-family:Arial;box-sizing:border-box}
+body{margin:0;background:linear-gradient(to right,#1d2671,#c33764)}
+.container{
+    background:#fff;width:500px;margin:50px auto;
+    padding:25px;border-radius:12px;display:none
+}
+input,select,button{
+    width:100%;padding:10px;margin:8px 0;
+    border-radius:6px;border:1px solid #ccc
+}
+button{background:#1d2671;color:#fff;font-size:16px;cursor:pointer}
+button:hover{background:#c33764}
+.card{
+    background:#f4f6f8;padding:15px;margin:15px 0;border-radius:10px
+}
+.progress-box{background:#ddd;border-radius:20px;overflow:hidden}
+.progress-bar{height:18px;background:#4caf50}
+.logout{color:red;cursor:pointer;text-align:center}
+.warning{color:red;font-weight:bold}
+.good{color:green;font-weight:bold}
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div class="container" id="loginBox">
+<h2>🔐 Login</h2>
+<input id="nameInput" placeholder="Enter Name">
+<select id="roleInput">
+<option value="">Select Role</option>
+<option value="kid">Kid</option>
+<option value="parent">Parent</option>
+</select>
+<button onclick="login()">Login</button>
+<p id="loginError" style="color:red"></p>
+</div>
+
+<!-- KID DASHBOARD -->
+<div class="container" id="kidBox">
+<h2>👦 Kid Dashboard</h2>
+<p>Welcome, <b id="kidName"></b></p>
+
+<div class="card">
+<h3>🎯 Attention Tokens</h3>
+<p>Total Limit: <b id="totalTokens">0</b></p>
+<p>Used: <b id="usedTokens">0</b></p>
+<p>Remaining: <b id="remainingTokens">0</b></p>
+
+<div class="progress-box">
+<div class="progress-bar" id="progressBar"></div>
+</div>
+<p class="warning" id="lowWarning"></p>
+</div>
+
+<!-- APP USAGE -->
+<div class="card">
+<h3>📱 App Usage</h3>
+<select id="appSelect">
+<option value="">Select App</option>
+<option value="youtube">YouTube (5/min)</option>
+<option value="instagram">Instagram (4/min)</option>
+<option value="games">Games (3/min)</option>
+<option value="ott">OTT (2/min)</option>
+<option value="learning">Learning App (1/min)</option>
+</select>
+<input type="number" id="minutesInput" placeholder="Minutes spent">
+<button onclick="useApp()">Submit App Usage</button>
+</div>
+
+<!-- GOOD HABITS -->
+<div class="card">
+<h3>🌱 Good Habits</h3>
+<select id="habitSelect">
+<option value="">Select Habit</option>
+<option value="reading">Reading (+3/min)</option>
+<option value="exercise">Exercise (+4/min)</option>
+<option value="homework">Homework (+5/min)</option>
+<option value="meditation">Meditation (+2/min)</option>
+</select>
+<input type="number" id="habitMinutes" placeholder="Minutes spent">
+<button onclick="addHabit()">Add Habit</button>
+<p class="good" id="habitMsg"></p>
+</div>
+
+<p class="logout" onclick="showLogin()">Logout</p>
+</div>
+
+<!-- PARENT DASHBOARD -->
+<div class="container" id="parentBox">
+<h2>👨‍👩‍👧 Parent Dashboard</h2>
+<p>Welcome, <b id="parentName"></b></p>
+
+<div class="card">
+<h3>Set Daily Token Limit (Kid ID)</h3>
+<input type="number" id="kidIdInput" placeholder="Kid User ID">
+<input type="number" id="tokenLimitInput" placeholder="Token Limit">
+<button onclick="setLimit()">Set Limit</button>
+<p id="parentMsg"></p>
+</div>
+
+<p class="logout" onclick="showLogin()">Logout</p>
+</div>
+
+<script>
+const API = "http://127.0.0.1:5000";
+let USER_ID = null;
+let total = 0, used = 0;
+
+const appRates = {youtube:5, instagram:4, games:3, ott:2, learning:1};
+const habitRates = {reading:3, exercise:4, homework:5, meditation:2};
+
+function hideAll(){
+loginBox.style.display="none";
+kidBox.style.display="none";
+parentBox.style.display="none";
+}
+
+function showLogin(){
+hideAll();
+loginBox.style.display="block";
+}
+
+function login(){
+fetch(API+"/login",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+name:nameInput.value,
+role:roleInput.value
+})
+})
+.then(res=>res.json())
+.then(data=>{
+USER_ID=data.user_id;
+hideAll();
+if(data.role==="kid"){
+kidName.innerText=nameInput.value;
+kidBox.style.display="block";
+loadTokens();
+}else{
+parentName.innerText=nameInput.value;
+parentBox.style.display="block";
+}
+});
+}
+
+function loadTokens(){
+fetch(API+"/tokens/"+USER_ID)
+.then(res=>res.json())
+.then(data=>{
+total=data.total_tokens;
+used=data.used_tokens;
+updateUI();
+});
+}
+
+function useApp(){
+fetch(API+"/use_app",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+user_id:USER_ID,
+app:appSelect.value,
+minutes:+minutesInput.value,
+rate:appRates[appSelect.value]
+})
+}).then(()=>loadTokens());
+}
+
+function addHabit(){
+fetch(API+"/add_habit",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+user_id:USER_ID,
+habit:habitSelect.value,
+minutes:+habitMinutes.value,
+rate:habitRates[habitSelect.value]
+})
+}).then(()=>{
+habitMsg.innerText="Good job! Tokens earned 🎉";
+loadTokens();
+});
+}
+
+function setLimit(){
+fetch(API+"/set_limit",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+kid_id:+kidIdInput.value,
+limit:+tokenLimitInput.value
+})
+}).then(()=>{
+parentMsg.innerText="✔ Token limit updated";
+});
+}
+
+function updateUI(){
+let remaining=total-used;
+totalTokens.innerText=total;
+usedTokens.innerText=used;
+remainingTokens.innerText=remaining;
+progressBar.style.width=(remaining/total*100)+"%";
+lowWarning.innerText=remaining<=20?"⚠ Low tokens! Do good habits.":"";
+}
+
+showLogin();
+</script>
+
+</body>
+</html>
